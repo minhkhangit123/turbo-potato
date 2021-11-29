@@ -91,9 +91,20 @@ io.sockets.on("connection", (socket) => {
         });
     });
 
+
+    // Set movie URL on rooms
+    socket.on('set movie', ({ username, roomnum, movieURL }) => {
+        var host = rooms['stream-' + socket.roomnum].host
+        if (rooms['stream-' + socket.roomnum] && socket.id == host){
+            rooms['stream-' + roomnum].currVideo = movieURL;
+            rooms['stream-' + roomnum].currTime = 0;
+            rooms['stream-' + roomnum].state = true;
+        }
+    })
     // ------------------------------------------------------------------------
     // New room
     socket.on('new room', ({ username, roomnum }) => {
+        
         // console.log("roomnum", roomnum);
         // console.log("username", username);
         // callback(true);
@@ -151,9 +162,7 @@ io.sockets.on("connection", (socket) => {
                 id: roomnum,
                 host: host,
                 currPlayer: 3,
-                currVideo: {
-                    html5: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
-                },
+                currVideo: '',
                 currTime: 0,
                 state: false,
                 hostName: socket.username,
@@ -175,10 +184,16 @@ io.sockets.on("connection", (socket) => {
                 socket.broadcast.to(host).emit('getData');
             }, 1000);
 
+            console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
+            console.log("rooms", rooms);
             rooms['stream-' + roomnum].users.push(username)
+            // io.to(socket.id).emit("isHost", {isHost: false});
+            // console.log("im sending to tyou")
 
         } else {
             console.log(username + " is the host")
+            // io.to(socket.roomnum).emit("isHost", {isHost: true});
+
         }
     });
     // ------------------------------------------------------------------------
@@ -204,23 +219,34 @@ io.sockets.on("connection", (socket) => {
                 })
             } else {
                 var caller = data.caller
-                if (caller != host){
+                // if (caller != host){
+                if (1 == host){
                     console.log("%s is comparing Host time", caller);
                     // console.log("data", data);
                     data.currTime = rooms['stream-' + socket.roomnum].currTime
                     data.state = rooms['stream-' + socket.roomnum].state
                     // Call necessary function on the original caller
-                    io.to(caller).emit("compareHost", data);
+
+                    // io.to(caller).emit("compareHost", data);
+
                     // socket.broadcast.to(caller).emit('compareHost', data);
                     // return data;
                 }
                 else {
                     console.log("Host update currTime from %s to %s and State from %s to %s", rooms['stream-' + socket.roomnum].currTime, data.currTime, rooms['stream-' + socket.roomnum].state, data.state )
-                    // console.log("rooms", rooms);
                     rooms['stream-' + socket.roomnum].currTime = data.currTime
                     rooms['stream-' + socket.roomnum].state = data.state
+                    let returnData = {
+                        room: data.room,
+                        host: rooms['stream-' + socket.roomnum].host,
+                        currTime: rooms['stream-' + socket.roomnum].currTime,
+                        state: rooms['stream-' + socket.roomnum].state,
+                        currVideo: rooms['stream-' + socket.roomnum].currVideo
+                    }
+                    // console.log("Current currTime is %s and State is %s", rooms['stream-' + socket.roomnum].currTime, rooms['stream-' + socket.roomnum].state )
+                    console.log("data", returnData);
                     // console.log("rooms['stream-' + socket.roomnum]", rooms['stream-' + socket.roomnum]);
-                    // io.to(socket.roomnum).emit("compareHost", data);
+                    io.to(socket.roomnum).emit("compareHost", returnData);
 
                     // console.log("data", data);
                     // console.log("socket.roomnum", socket.roomnum);
@@ -232,15 +258,7 @@ io.sockets.on("connection", (socket) => {
         }
 
     })
-    // Send Message in chat
-    socket.on('send message', function(data) {
-        var encodedMsg = data.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        // console.log(data);
-        io.sockets.in("room-" + socket.roomnum).emit('new message', {
-            msg: encodedMsg,
-            user: socket.username
-        });
-    });
+
     // Disconnect
     socket.on('disconnect', function (data) {
 
@@ -253,11 +271,13 @@ io.sockets.on("connection", (socket) => {
             text: `${p_user.username} has left the room`,
           });
         }
+
         if (rooms['stream-' + socket.roomnum]){
             if (socket.id == rooms['stream-' + socket.roomnum].host){
                 var id = rooms.indexOf("room-" + socket.roomnum)
                 rooms.splice(id, 1);
                 delete rooms['stream-' + socket.roomnum]
+                console.log("rooms", rooms);
             }
         }
 
