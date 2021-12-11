@@ -100,6 +100,7 @@ io.sockets.on("connection", (socket) => {
             rooms['stream-' + roomnum].currVideo = movieURL;
             rooms['stream-' + roomnum].currTime = 0;
             rooms['stream-' + roomnum].state = true;
+            rooms['stream-' + roomnum].muted = true;
             io.in(roomnum).emit("getURLMovie", {
                 movieURL
             });
@@ -167,6 +168,7 @@ io.sockets.on("connection", (socket) => {
                 currVideo: '',
                 currTime: 0,
                 state: false,
+                muted:true,
                 hostName: socket.username,
                 users: [socket.username],
             }
@@ -200,13 +202,14 @@ io.sockets.on("connection", (socket) => {
     // ------------------------------------------------------------------------
     // Get host data
     socket.on('get host data', function (data) {
-         console.log("data", data);
+        console.log("data", data);
         if (rooms['stream-' + socket.roomnum]) {
             var roomnum = data.room
             // var host = io.sockets.adapter.rooms['room-' + roomnum].host
             var host = rooms['stream-' + socket.roomnum].host
+            
             console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
-           
+
             console.log("🚀 ~ file: server.js ~ line 208 ~ socket.roomnum", socket.id)
             console.log("🚀 ~ file: server.js ~ line 208 ~ host", host)
 
@@ -223,40 +226,42 @@ io.sockets.on("connection", (socket) => {
                     caller: caller
                 })
             } else {
-                var caller = data.caller
+                
                 // if (caller != host){
-                if (socket.id !== host) {
-                    console.log("%s is comparing Host time", caller);
-                    // console.log("data", data);
-                    data.currTime = rooms['stream-' + socket.roomnum].currTime
-                    data.state = rooms['stream-' + socket.roomnum].state
-                    let returnData = {
-                        room: data.room,
-                        host: rooms['stream-' + socket.roomnum].host,
-                        currTime: rooms['stream-' + socket.roomnum].currTime,
-                        state: rooms['stream-' + socket.roomnum].state,
-                        currVideo: rooms['stream-' + socket.roomnum].currVideo
-                    }
-                    // Call necessary function on the original caller
+                if (socket.id == host  ) {
+                    //     console.log("%s is comparing Host time", caller);
+                    //     // console.log("data", data);
+                    //     data.currTime = rooms['stream-' + socket.roomnum].currTime
+                    //     data.state = rooms['stream-' + socket.roomnum].state
+                    //     let returnData = {
+                    //         room: data.room,
+                    //         host: rooms['stream-' + socket.roomnum].host,
+                    //         currTime: rooms['stream-' + socket.roomnum].currTime,
+                    //         state: rooms['stream-' + socket.roomnum].state,
+                    //         currVideo: rooms['stream-' + socket.roomnum].currVideo
+                    //     }
+                    //     // Call necessary function on the original caller
 
-                     io.to(socket.id).emit("compareHost", returnData);
+                    //      io.to(socket.id).emit("compareHost", returnData);
 
-                    // socket.broadcast.to(caller).emit('compareHost', data);
-                    // return data;
-                }
-                else {
+                    //     // socket.broadcast.to(caller).emit('compareHost', data);
+                    //     // return data;
+                    // }
+                    // else {
                     console.log("Host update currTime from %s to %s and State from %s to %s", rooms['stream-' + socket.roomnum].currTime, data.currTime, rooms['stream-' + socket.roomnum].state, data.state)
                     rooms['stream-' + socket.roomnum].currTime = data.currTime
                     rooms['stream-' + socket.roomnum].state = data.state
+                    rooms['stream-' + socket.roomnum].muted = data.muted
                     let returnData = {
                         room: data.room,
                         host: rooms['stream-' + socket.roomnum].host,
-                        currTime: rooms['stream-' + socket.roomnum].currTime,
-                        state: rooms['stream-' + socket.roomnum].state,
+                        currTime: data.currTime,
+                        state: data.state,
+                        muted: data.muted,
                         currVideo: rooms['stream-' + socket.roomnum].currVideo
                     }
                     // console.log("Current currTime is %s and State is %s", rooms['stream-' + socket.roomnum].currTime, rooms['stream-' + socket.roomnum].state )
-    
+
                     // console.log("rooms['stream-' + socket.roomnum]", rooms['stream-' + socket.roomnum]);
                     socket.to(socket.roomnum).emit("compareHost", returnData);
 
