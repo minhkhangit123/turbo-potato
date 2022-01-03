@@ -58,9 +58,9 @@ io.sockets.on("connection", (socket) => {
     ///////////////////////////////////////////////////////////
 
     //for a new user joining the room
-    socket.on("joinRoom", ({ username, roomname }) => {
+    socket.on("joinRoom", ({ username, roomnum }) => {
         //* create user
-        const p_user = join_User(socket.id, username, roomname);
+        const p_user = join_User(socket.id, username, roomnum);
         socket.join(p_user.room);
 
         //display a welcome message to the user who have joined a room
@@ -79,12 +79,12 @@ io.sockets.on("connection", (socket) => {
     });
 
     //user sending message
-    socket.on("chat", (text, username, roomname) => {
+    socket.on("chat", (text, username, roomnum) => {
         // console.log("text", text, username, roomname);
         //gets the room user and the message sent
         const p_user = get_Current_User(socket.id);
 
-        io.to(roomname).emit("message", {
+        io.to(roomnum).emit("message", {
             userId: socket.id,
             username: username,
             text: text,
@@ -108,7 +108,8 @@ io.sockets.on("connection", (socket) => {
     })
     // ------------------------------------------------------------------------
     // New room
-    socket.on('new room', ({ username, roomnum }) => {
+    socket.on('new room', ({ username, roomnum, userid }) => {
+        console.log("🚀 ~ file: server.js ~ line 112 ~ socket.on ~ userid", userid)
 
         console.log("roomnum", roomnum);
         console.log("username", username);
@@ -116,6 +117,7 @@ io.sockets.on("connection", (socket) => {
         // Roomnum passed through
         socket.roomnum = roomnum;
         socket.username = username;
+        socket.userid = userid;
         console.log('%s connected to room %s: %s sockets connected', socket.username, socket.roomnum, connections.length);
 
         // This stores the room data for all sockets
@@ -145,69 +147,97 @@ io.sockets.on("connection", (socket) => {
 
                 io.to(socket.id).emit("hostDisconnect");
             }
-            socket.send(socket.id)
-            // Sets the first socket to join as the host
-            host = socket.id
-            init = true
-
+            else{
+                socket.send(socket.id)
+                // Sets the first socket to join as the host
+                host = socket.id
+                init = true
+    
+                console.log("Creating new room", roomnum);
+                rooms['stream-' + roomnum] = {
+                    id: roomnum,
+                    host: host,
+                    currPlayer: 3,
+                    currVideo: '',
+                    currTime: 0,
+                    state: false,
+                    muted: true,
+                    hostName: socket.username,
+                    users: [socket.userid],
+                }
+                console.log(username + " is the host")
+                socket.join(socket.roomnum);
+                io.to(socket.id).emit("isHost", { isHost: true });
+            }
+            
             // Set the host on the client side   
             //console.log(socket.id)
         } else {
             // console.log(socket.roomnum)
-
             host = rooms['stream-' + roomnum].host;
-            if (host != socket.id) {
+            hostName = rooms['stream-' + roomnum].hostName;
+            if (hostName == socket.username) {
                 console.log("🚀 ~ file: server.js ~ line 161 ~ socket.on ~ socket.id", socket.id)
                 console.log("🚀 ~ file: server.js ~ line 161 ~ socket.on ~ host", host)
                 io.to(socket.id).emit("hostAgain");
+            }
+            else if (socket.id != host) {
+                socket.join(socket.roomnum);
+                // console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
+                // console.log("rooms", rooms);
+                rooms['stream-' + roomnum].users.push(userid)
+                io.to(host).emit("getData", rooms['stream-' + roomnum].users);
+                io.to(socket.id).emit("isHost", { isHost: false });
+                // console.log("im sending to tyou")
+
             }
 
         }
 
         // Actually join the room      
-        socket.join(socket.roomnum);
+       
 
 
         // Sets the default values when first initializing
-        if (init) {
-            console.log("Creating new room", roomnum);
-            rooms['stream-' + roomnum] = {
-                id: roomnum,
-                host: host,
-                currPlayer: 3,
-                currVideo: '',
-                currTime: 0,
-                state: false,
-                muted: true,
-                hostName: socket.username,
-                users: [socket.username],
-            }
-            // console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
-        }
+        // if (init) {
+        //     console.log("Creating new room", roomnum);
+        //     rooms['stream-' + roomnum] = {
+        //         id: roomnum,
+        //         host: host,
+        //         currPlayer: 3,
+        //         currVideo: '',
+        //         currTime: 0,
+        //         state: false,
+        //         muted: true,
+        //         hostName: socket.username,
+        //         users: [socket.username],
+        //     }
+        //     // console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
+        // }
 
-        // console.log("host ID", host);
-        // console.log("connect socket.id", socket.id);
+        // // console.log("host ID", host);
+        // // console.log("connect socket.id", socket.id);
 
-        // Get time from host which calls change time for that socket
-        if (socket.id != host) {
-            //socket.broadcast.to(host).emit('getTime', { id: socket.id });
-            // console.log("Call the host " + host)
+        // // Get time from host which calls change time for that socket
+        // if (socket.id != host) {
+        //     //socket.broadcast.to(host).emit('getTime', { id: socket.id });
+        //     // console.log("Call the host " + host)
 
-            // Set a timeout so the video can load before it syncs
+        //     // Set a timeout so the video can load before it syncs
 
-            io.to(host).emit("getData");
+        //     io.to(host).emit("getData");
 
-            // console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
-            // console.log("rooms", rooms);
-            rooms['stream-' + roomnum].users.push(username)
-            io.to(socket.id).emit("isHost", { isHost: false });
-            // console.log("im sending to tyou")
+        //     // console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
+        //     // console.log("rooms", rooms);
+        //     rooms['stream-' + roomnum].users.push(username)
+        //     io.to(socket.id).emit("isHost", { isHost: false });
+        //     // console.log("im sending to tyou")
 
-        } else {
-            console.log(username + " is the host")
-            io.to(socket.id).emit("isHost", { isHost: true });
+        // } else {
+        //     console.log(username + " is the host")
+        //     io.to(socket.id).emit("isHost", { isHost: true });
 
-        }
+        // }
     });
     // ------------------------------------------------------------------------
     // Get host data
@@ -227,61 +257,31 @@ io.sockets.on("connection", (socket) => {
             // Call back not supported when broadcasting
 
             // Checks if it has the data, if not get the data and recursively call again
-            if (data.currTime === undefined) {
-                // Saves the original caller so the host can send back the data
-                console.log("getPlayerData");
-                var caller = socket.id
-                socket.broadcast.to(host).emit('getPlayerData', {
-                    room: roomnum,
-                    caller: caller
-                })
-            } else {
 
-                // if (caller != host){
-                if (socket.id == host) {
-                    //     console.log("%s is comparing Host time", caller);
-                    //     // console.log("data", data);
-                    //     data.currTime = rooms['stream-' + socket.roomnum].currTime
-                    //     data.state = rooms['stream-' + socket.roomnum].state
-                    //     let returnData = {
-                    //         room: data.room,
-                    //         host: rooms['stream-' + socket.roomnum].host,
-                    //         currTime: rooms['stream-' + socket.roomnum].currTime,
-                    //         state: rooms['stream-' + socket.roomnum].state,
-                    //         currVideo: rooms['stream-' + socket.roomnum].currVideo
-                    //     }
-                    //     // Call necessary function on the original caller
 
-                    //      io.to(socket.id).emit("compareHost", returnData);
+            // if (caller != host){
+            if (socket.id == host) {
 
-                    //     // socket.broadcast.to(caller).emit('compareHost', data);
-                    //     // return data;
-                    // }
-                    // else {
-                    console.log("Host update currTime from %s to %s and State from %s to %s", rooms['stream-' + socket.roomnum].currTime, data.currTime, rooms['stream-' + socket.roomnum].state, data.state)
-                    rooms['stream-' + socket.roomnum].currTime = data.currTime
-                    rooms['stream-' + socket.roomnum].state = data.state
-                    rooms['stream-' + socket.roomnum].muted = data.muted
-                    let returnData = {
-                        room: data.room,
-                        host: rooms['stream-' + socket.roomnum].host,
-                        currTime: data.currTime,
-                        state: data.state,
-                        muted: data.muted,
-                        currVideo: rooms['stream-' + socket.roomnum].currVideo
-                    }
-                    // console.log("Current currTime is %s and State is %s", rooms['stream-' + socket.roomnum].currTime, rooms['stream-' + socket.roomnum].state )
-
-                    // console.log("rooms['stream-' + socket.roomnum]", rooms['stream-' + socket.roomnum]);
-                    socket.to(socket.roomnum).emit("compareHost", returnData);
-
-                    // console.log("data", data);
-                    // console.log("socket.roomnum", socket.roomnum);
-                    // socket.to('stream-' + socket.roomnum).emit('compareHost', data);
-                    // io.to(socket.roomnum).emit('compareHost', data);
-                    // socket.broadcast.emit('compareHost', data);
+                console.log("Host update currTime from %s to %s and State from %s to %s", rooms['stream-' + socket.roomnum].currTime, data.currTime, rooms['stream-' + socket.roomnum].state, data.state)
+                rooms['stream-' + socket.roomnum].currTime = data.currTime
+                rooms['stream-' + socket.roomnum].state = data.state
+                rooms['stream-' + socket.roomnum].muted = data.muted
+                let returnData = {
+                    room: data.room,
+                    host: rooms['stream-' + socket.roomnum].host,
+                    currTime: data.currTime,
+                    state: data.state,
+                    muted: data.muted,
+                    currVideo: rooms['stream-' + socket.roomnum].currVideo
                 }
+                // console.log("Current currTime is %s and State is %s", rooms['stream-' + socket.roomnum].currTime, rooms['stream-' + socket.roomnum].state )
+
+                // console.log("rooms['stream-' + socket.roomnum]", rooms['stream-' + socket.roomnum]);
+                socket.to(socket.roomnum).emit("compareHost", returnData);
+
+
             }
+
         }
 
     })
@@ -310,11 +310,11 @@ io.sockets.on("connection", (socket) => {
                 console.log("rooms", rooms);
             }
             else {
-                if (rooms['stream-' + socket.roomnum].users.indexOf(socket.username) != -1) {
-                    console.log("🚀 ~ file: server.js ~ line 334 ~ socket.username", socket.username)
-                    rooms['stream-' + socket.roomnum].users.splice((rooms['stream-' + socket.roomnum].users.indexOf(socket.username)), 1);
+                if (rooms['stream-' + socket.roomnum].users.indexOf(socket.userid) != -1) {
+                    console.log("🚀 ~ file: server.js ~ line 334 ~ socket.username", socket.userid)
+                    rooms['stream-' + socket.roomnum].users.splice((rooms['stream-' + socket.roomnum].users.indexOf(socket.userid)), 1);
                     console.log("🚀 ~ file: server.js ~ line 335 ~  rooms['stream-' + socket.roomnum].users", rooms['stream-' + socket.roomnum].users)
-
+                    io.to(rooms['stream-' + socket.roomnum].host).emit("getData", rooms['stream-' + socket.roomnum].users);
 
                 }
             }
