@@ -93,7 +93,7 @@ io.sockets.on("connection", (socket) => {
 
 
     // Set movie URL on rooms
-    socket.on('set movie', ({ username, roomnum, movieURL }) => {
+    socket.on('set movie', ({ username, roomnum, movieURL,movieId }) => {
         console.log("🚀 ~ file: server.js ~ line 97 ~ socket.on ~ roomnum", roomnum)
         var host = rooms['stream-' + socket.roomnum].host
         if (rooms['stream-' + socket.roomnum] && socket.id == host) {
@@ -101,8 +101,12 @@ io.sockets.on("connection", (socket) => {
             rooms['stream-' + roomnum].currTime = 0;
             rooms['stream-' + roomnum].state = true;
             rooms['stream-' + roomnum].muted = true;
+            rooms['stream-' + roomnum].currVideoId = movieId;
             io.in(roomnum).emit("getURLMovie", {
                 movieURL
+            });
+            io.in(roomnum).emit("getChoosedMovieId", {
+                movieId
             });
         }
     })
@@ -186,7 +190,7 @@ io.sockets.on("connection", (socket) => {
                 // console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
                 // console.log("rooms", rooms);
                 rooms['stream-' + roomnum].users.push(userid)
-                io.to(host).emit("getData", rooms['stream-' + roomnum].users);
+                io.to(socket.roomnum).emit("getData", rooms['stream-' + roomnum].users);
                 io.to(socket.id).emit("isHost", { isHost: false });
                 // console.log("im sending to tyou")
 
