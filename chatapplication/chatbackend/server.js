@@ -5,7 +5,9 @@ const app = express();
 const socket = require("socket.io");
 const color = require("colors");
 const cors = require("cors");
-const { get_Current_User, user_Disconnect, join_User } = require("./dummyuser");
+
+
+
 
 app.use(express());
 
@@ -31,6 +33,34 @@ userrooms = {}
 
 // Set given room for url parameter
 var given_room = ""
+
+const c_users = [];
+
+// joins the user to the specific chatroom
+function join_User(id, username, room) {
+  const p_user = { id, username, room };
+
+  c_users.push(p_user);
+  // console.log(c_users, " users");
+
+  return p_user;
+}
+
+console.log("user out ", c_users);
+
+// Gets a particular user id to return the current user
+function get_Current_User(id) {
+  return c_users.find((p_user) => p_user.id === id);
+}
+
+// called when the user leaves the chat and its user object deleted from array
+function user_Disconnect(id) {
+  const index = c_users.findIndex((p_user) => p_user.id === id);
+
+  if (index !== -1) {
+    return c_users.splice(index, 1)[0];
+  }
+}
 
 app.get('watchgroup/:room', function (req, res) {
     given_room = req.params.room
@@ -113,16 +143,12 @@ io.sockets.on("connection", (socket) => {
     // ------------------------------------------------------------------------
     // New room
     socket.on('new room', ({ username, roomnum, userid }) => {
-        console.log("🚀 ~ file: server.js ~ line 112 ~ socket.on ~ userid", userid)
-
-        console.log("roomnum", roomnum);
-        console.log("username", username);
+        
         // callback(true);
         // Roomnum passed through
         socket.roomnum = roomnum;
         socket.username = username;
         socket.userid = userid;
-        console.log('%s connected to room %s: %s sockets connected', socket.username, socket.roomnum, connections.length);
 
         // This stores the room data for all sockets
         userrooms[socket.id] = roomnum
@@ -143,9 +169,6 @@ io.sockets.on("connection", (socket) => {
 
         // Checks if the room exists or not
 
-        //if (io.sockets.adapter.rooms.get(socket.roomnum) === undefined) 
-        // console.log("🚀 ~ file: server.js ~ line 123 ~ socket.on ~ rooms.includes('stream-' + socket.roomnum)", rooms['stream-' + socket.roomnum])
-        // console.log("rooms['stream-' + socket.roomnum]", rooms['stream-' + socket.roomnum]);
         if (!rooms['stream-' + socket.roomnum]) {
             if (username != roomnum) {
 
@@ -157,7 +180,6 @@ io.sockets.on("connection", (socket) => {
                 host = socket.id
                 init = true
     
-                console.log("Creating new room", roomnum);
                 rooms['stream-' + roomnum] = {
                     id: roomnum,
                     host: host,
@@ -169,7 +191,6 @@ io.sockets.on("connection", (socket) => {
                     hostName: socket.username,
                     users: [socket.userid],
                 }
-                console.log(username + " is the host")
                 socket.join(socket.roomnum);
                 io.to(socket.id).emit("isHost", { isHost: true });
             }
@@ -181,81 +202,31 @@ io.sockets.on("connection", (socket) => {
             host = rooms['stream-' + roomnum].host;
             hostName = rooms['stream-' + roomnum].hostName;
             if (hostName == socket.username) {
-                console.log("🚀 ~ file: server.js ~ line 161 ~ socket.on ~ socket.id", socket.id)
-                console.log("🚀 ~ file: server.js ~ line 161 ~ socket.on ~ host", host)
+                
                 io.to(socket.id).emit("hostAgain");
             }
             else if (socket.id != host) {
                 socket.join(socket.roomnum);
-                // console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
-                // console.log("rooms", rooms);
+                
                 rooms['stream-' + roomnum].users.push(userid)
                 io.to(socket.roomnum).emit("getData", rooms['stream-' + roomnum].users);
                 io.to(socket.id).emit("isHost", { isHost: false });
-                // console.log("im sending to tyou")
 
             }
 
         }
 
-        // Actually join the room      
-       
-
-
-        // Sets the default values when first initializing
-        // if (init) {
-        //     console.log("Creating new room", roomnum);
-        //     rooms['stream-' + roomnum] = {
-        //         id: roomnum,
-        //         host: host,
-        //         currPlayer: 3,
-        //         currVideo: '',
-        //         currTime: 0,
-        //         state: false,
-        //         muted: true,
-        //         hostName: socket.username,
-        //         users: [socket.username],
-        //     }
-        //     // console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
-        // }
-
-        // // console.log("host ID", host);
-        // // console.log("connect socket.id", socket.id);
-
-        // // Get time from host which calls change time for that socket
-        // if (socket.id != host) {
-        //     //socket.broadcast.to(host).emit('getTime', { id: socket.id });
-        //     // console.log("Call the host " + host)
-
-        //     // Set a timeout so the video can load before it syncs
-
-        //     io.to(host).emit("getData");
-
-        //     // console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
-        //     // console.log("rooms", rooms);
-        //     rooms['stream-' + roomnum].users.push(username)
-        //     io.to(socket.id).emit("isHost", { isHost: false });
-        //     // console.log("im sending to tyou")
-
-        // } else {
-        //     console.log(username + " is the host")
-        //     io.to(socket.id).emit("isHost", { isHost: true });
-
-        // }
+      
     });
     // ------------------------------------------------------------------------
     // Get host data
     socket.on('get host data', function (data) {
-        console.log("data", data);
         if (rooms['stream-' + socket.roomnum]) {
             var roomnum = data.room
             // var host = io.sockets.adapter.rooms['room-' + roomnum].host
             var host = rooms['stream-' + socket.roomnum].host
 
-            console.log("rooms['stream-' + roomnum]", rooms['stream-' + roomnum]);
-
-            console.log("🚀 ~ file: server.js ~ line 208 ~ socket.roomnum", socket.id)
-            console.log("🚀 ~ file: server.js ~ line 208 ~ host", host)
+           
 
             // Broadcast to current host and set false
             // Call back not supported when broadcasting
@@ -266,7 +237,6 @@ io.sockets.on("connection", (socket) => {
             // if (caller != host){
             if (socket.id == host) {
 
-                console.log("Host update currTime from %s to %s and State from %s to %s", rooms['stream-' + socket.roomnum].currTime, data.currTime, rooms['stream-' + socket.roomnum].state, data.state)
                 rooms['stream-' + socket.roomnum].currTime = data.currTime
                 rooms['stream-' + socket.roomnum].state = data.state
                 rooms['stream-' + socket.roomnum].muted = data.muted
@@ -278,9 +248,7 @@ io.sockets.on("connection", (socket) => {
                     muted: data.muted,
                     currVideo: rooms['stream-' + socket.roomnum].currVideo
                 }
-                // console.log("Current currTime is %s and State is %s", rooms['stream-' + socket.roomnum].currTime, rooms['stream-' + socket.roomnum].state )
-
-                // console.log("rooms['stream-' + socket.roomnum]", rooms['stream-' + socket.roomnum]);
+    
                 socket.to(socket.roomnum).emit("compareHost", returnData);
 
 
@@ -292,9 +260,7 @@ io.sockets.on("connection", (socket) => {
 
     // Disconnect
     socket.on('disconnect', function (data) {
-        console.log('disconnected')
         const p_user = user_Disconnect(socket.id);
-        console.log("🚀 ~ file: server.js ~ line 293 ~ p_user", p_user)
 
         if (p_user) {
             io.to(p_user.room).emit("message", {
@@ -306,18 +272,14 @@ io.sockets.on("connection", (socket) => {
 
         if (rooms['stream-' + socket.roomnum]) {
             if (socket.id == rooms['stream-' + socket.roomnum].host) {
-                console.log('host is disconnected')
                 io.to(rooms['stream-' + socket.roomnum].id).emit("hostDisconnect");
                 var id = rooms.indexOf("room-" + socket.roomnum)
                 rooms.splice(id, 1);
                 delete rooms['stream-' + socket.roomnum]
-                console.log("rooms", rooms);
             }
             else {
                 if (rooms['stream-' + socket.roomnum].users.indexOf(socket.userid) != -1) {
-                    console.log("🚀 ~ file: server.js ~ line 334 ~ socket.username", socket.userid)
                     rooms['stream-' + socket.roomnum].users.splice((rooms['stream-' + socket.roomnum].users.indexOf(socket.userid)), 1);
-                    console.log("🚀 ~ file: server.js ~ line 335 ~  rooms['stream-' + socket.roomnum].users", rooms['stream-' + socket.roomnum].users)
                     io.to(rooms['stream-' + socket.roomnum].host).emit("getData", rooms['stream-' + socket.roomnum].users);
 
                 }
@@ -329,55 +291,12 @@ io.sockets.on("connection", (socket) => {
         if (users.indexOf(socket.username) != -1) {
             users.splice((users.indexOf(socket.username)), 1);
             //updateUsernames();
-            console.log(socket.username + ' is disconnected 1: %s sockets remaining', connections.length);
+           
         }
-        else {
-            console.log(socket.id + ' is disconnected 2: %s sockets remaining', connections.length);
-
-        }
+        
 
         connections.splice(connections.indexOf(socket), 1);
-        // console.log(socket.username + ' is disconnected: %s sockets remaining', connections.length);
-
-        // console.log(io.sockets.adapter.rooms['room-' + socket.roomnum])
-        // console.log(socket.roomnum)
-
-
-        // HOST DISCONNECT
-        // Need to check if current socket is the host of the roomnum
-        // If it is the host, needs to auto assign to another socket in the room
-
-        // Grabs room from userrooms data structure
-        // var id = socket.id
-        // var roomnum = userrooms[id]
-        // //var room = io.sockets.adapter.rooms.get(socket.roomnum)
-        // rooms.find((room) => console.log("🚀 ~ file: server.js ~ line 313 ~ room", room)
-        // )
-        // var room = rooms.find((room) => room.id === socket.roomnum)
-
-        // // If you are not the last socket to leave
-        // if (room !== undefined) {
-        //     // If you are the host
-        //     if (socket.id == room.host) {
-        //         // Reassign
-        //         console.log("hello i am the host " + socket.id + " and i am leaving my responsibilities to " + Object.keys(room.sockets)[0])
-        //         io.to(Object.keys(room.sockets)[0]).emit('autoHost', {
-        //             roomnum: roomnum
-        //         })
-        //     }
-        //     const index = c_users.findIndex((p_user) => p_user.id === id);
-
-        //     if (index !== -1) {
-        //         return rooms.splice(index, 1)[0];
-        //     }
-        //     // Remove from users list
-        //     // If socket username is found
-
-        // }
-
-        // Delete socket from userrooms
-
-
+       
     });
 
     function updateRoomUsers(roomnum) {
