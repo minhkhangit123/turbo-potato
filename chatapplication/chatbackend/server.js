@@ -38,28 +38,27 @@ const c_users = [];
 
 // joins the user to the specific chatroom
 function join_User(id, username, room) {
-  const p_user = { id, username, room };
+    const p_user = { id, username, room };
 
-  c_users.push(p_user);
-  // console.log(c_users, " users");
+    c_users.push(p_user);
+    // console.log(c_users, " users");
 
-  return p_user;
+    return p_user;
 }
 
-console.log("user out ", c_users);
 
 // Gets a particular user id to return the current user
 function get_Current_User(id) {
-  return c_users.find((p_user) => p_user.id === id);
+    return c_users.find((p_user) => p_user.id === id);
 }
 
 // called when the user leaves the chat and its user object deleted from array
 function user_Disconnect(id) {
-  const index = c_users.findIndex((p_user) => p_user.id === id);
+    const index = c_users.findIndex((p_user) => p_user.id === id);
 
-  if (index !== -1) {
-    return c_users.splice(index, 1)[0];
-  }
+    if (index !== -1) {
+        return c_users.splice(index, 1)[0];
+    }
 }
 
 app.get('watchgroup/:room', function (req, res) {
@@ -88,25 +87,7 @@ io.sockets.on("connection", (socket) => {
     ///////////////////////////////////////////////////////////
 
     //for a new user joining the room
-    socket.on("joinRoom", ({ username, roomnum }) => {
-        //* create user
-        const p_user = join_User(socket.id, username, roomnum);
-        socket.join(p_user.room);
-
-        //display a welcome message to the user who have joined a room
-        socket.emit("message", {
-            userId: p_user.id,
-            username: p_user.username,
-            text: `Welcome ${p_user.username}`,
-        });
-
-        //displays a joined room message to all other room users except that particular user
-        socket.broadcast.to(p_user.room).emit("message", {
-            userId: p_user.id,
-            username: p_user.username,
-            text: `${p_user.username} has joined the chat`,
-        });
-    });
+    
 
     //user sending message
     socket.on("chat", (text, username, roomnum) => {
@@ -118,13 +99,14 @@ io.sockets.on("connection", (socket) => {
             userId: socket.id,
             username: username,
             text: text,
+            status: 'normal'
         });
     });
 
 
     // Set movie URL on rooms
-    socket.on('set movie', ({ username, roomnum, movieURL,movieId }) => {
-        console.log("🚀 ~ file: server.js ~ line 97 ~ socket.on ~ roomnum", roomnum)
+    socket.on('set movie', ({ username, roomnum, movieURL, movieId }) => {
+
         var host = rooms['stream-' + socket.roomnum].host
         if (rooms['stream-' + socket.roomnum] && socket.id == host) {
             rooms['stream-' + roomnum].currVideo = movieURL;
@@ -143,7 +125,7 @@ io.sockets.on("connection", (socket) => {
     // ------------------------------------------------------------------------
     // New room
     socket.on('new room', ({ username, roomnum, userid }) => {
-        
+
         // callback(true);
         // Roomnum passed through
         socket.roomnum = roomnum;
@@ -174,12 +156,12 @@ io.sockets.on("connection", (socket) => {
 
                 io.to(socket.id).emit("hostDisconnect");
             }
-            else{
+            else {
                 socket.send(socket.id)
                 // Sets the first socket to join as the host
                 host = socket.id
                 init = true
-    
+
                 rooms['stream-' + roomnum] = {
                     id: roomnum,
                     host: host,
@@ -193,30 +175,62 @@ io.sockets.on("connection", (socket) => {
                 }
                 socket.join(socket.roomnum);
                 io.to(socket.id).emit("isHost", { isHost: true });
+                join_User(socket.id, username, roomnum);
+                socket.emit("message", {
+                    userId: socket.id,
+                    username: username,
+                    text: `Welcome ${username}`,
+                    status: 'normal'
+                });
+
+                //displays a joined room message to all other room users except that particular user
+
             }
-            
+
             // Set the host on the client side   
             //console.log(socket.id)
         } else {
             // console.log(socket.roomnum)
             host = rooms['stream-' + roomnum].host;
             hostName = rooms['stream-' + roomnum].hostName;
+            members = rooms['stream-' + roomnum].users
             if (hostName == socket.username) {
-                
+
                 io.to(socket.id).emit("hostAgain");
             }
             else if (socket.id != host) {
-                socket.join(socket.roomnum);
-                
-                rooms['stream-' + roomnum].users.push(userid)
-                io.to(socket.roomnum).emit("getData", rooms['stream-' + roomnum].users);
-                io.to(socket.id).emit("isHost", { isHost: false });
+                console.log("🚀 ~ file: server.js ~ line 211 ~ socket.on ~ members.lengths", members.length)
+
+                if (members.length >= 10) {
+                    console.log("🚀 ~ file: server.js ~ line 213 ~ socket.on ~ members", members)
+                    io.to(socket.id).emit("fullRoom", { isFull: true });
+                }
+                else {
+                    socket.join(socket.roomnum);
+                    join_User(socket.id, username, roomnum);
+                    rooms['stream-' + roomnum].users.push(userid)
+                    io.to(socket.roomnum).emit("getData", rooms['stream-' + roomnum].users);
+                    io.to(socket.id).emit("isHost", { isHost: false });
+                    socket.emit("message", {
+                        userId: socket.id,
+                        username: username,
+                        text: `Welcome ${username}`,
+                        status: 'normal'
+                    });
+                    socket.broadcast.to(roomnum).emit("message", {
+                        userId: socket.id,
+                        username: username,
+                        text: `${username} has joined the chat`,
+                        status: 'joined'
+                    });
+                }
+
 
             }
 
         }
 
-      
+
     });
     // ------------------------------------------------------------------------
     // Get host data
@@ -226,7 +240,7 @@ io.sockets.on("connection", (socket) => {
             // var host = io.sockets.adapter.rooms['room-' + roomnum].host
             var host = rooms['stream-' + socket.roomnum].host
 
-           
+
 
             // Broadcast to current host and set false
             // Call back not supported when broadcasting
@@ -240,16 +254,8 @@ io.sockets.on("connection", (socket) => {
                 rooms['stream-' + socket.roomnum].currTime = data.currTime
                 rooms['stream-' + socket.roomnum].state = data.state
                 rooms['stream-' + socket.roomnum].muted = data.muted
-                let returnData = {
-                    room: data.room,
-                    host: rooms['stream-' + socket.roomnum].host,
-                    currTime: data.currTime,
-                    state: data.state,
-                    muted: data.muted,
-                    currVideo: rooms['stream-' + socket.roomnum].currVideo
-                }
-    
-                socket.to(socket.roomnum).emit("compareHost", returnData);
+                
+                socket.to(socket.roomnum).emit("compareHost", rooms['stream-' + socket.roomnum]);
 
 
             }
@@ -261,12 +267,15 @@ io.sockets.on("connection", (socket) => {
     // Disconnect
     socket.on('disconnect', function (data) {
         const p_user = user_Disconnect(socket.id);
+        console.log("🚀 ~ file: server.js ~ line 299 ~ p_user", p_user)
 
         if (p_user) {
             io.to(p_user.room).emit("message", {
                 userId: p_user.id,
                 username: p_user.username,
                 text: `${p_user.username} has left the room`,
+                status: 'left'
+
             });
         }
 
@@ -291,18 +300,11 @@ io.sockets.on("connection", (socket) => {
         if (users.indexOf(socket.username) != -1) {
             users.splice((users.indexOf(socket.username)), 1);
             //updateUsernames();
-           
+
         }
-        
 
         connections.splice(connections.indexOf(socket), 1);
-       
+
     });
 
-    function updateRoomUsers(roomnum) {
-        if (io.sockets.adapter.rooms.get(socket.roomnum) !== undefined) {
-            var roomUsers = io.sockets.adapter.rooms.get(socket.roomnum).users
-            io.sockets.in(roomnum).emit('get users', roomUsers)
-        }
-    }
 });
