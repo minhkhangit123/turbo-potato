@@ -199,10 +199,8 @@ io.sockets.on("connection", (socket) => {
                 io.to(socket.id).emit("hostAgain");
             }
             else if (socket.id != host) {
-                console.log("🚀 ~ file: server.js ~ line 211 ~ socket.on ~ members.lengths", members.length)
 
                 if (members.length >= 10) {
-                    console.log("🚀 ~ file: server.js ~ line 213 ~ socket.on ~ members", members)
                     io.to(socket.id).emit("fullRoom", { isFull: true });
                 }
                 else {
@@ -267,7 +265,6 @@ io.sockets.on("connection", (socket) => {
     // Disconnect
     socket.on('disconnect', function (data) {
         const p_user = user_Disconnect(socket.id);
-        console.log("🚀 ~ file: server.js ~ line 299 ~ p_user", p_user)
 
         if (p_user) {
             io.to(p_user.room).emit("message", {
